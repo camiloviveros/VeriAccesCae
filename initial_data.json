@@ -1,0 +1,322 @@
+[
+    {
+      "model": "authentication.role",
+      "pk": 1,
+      "fields": {
+        "name": "Administrator",
+        "description": "Acceso completo a todas las funcionalidades del sistema",
+        "created_at": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "model": "authentication.role",
+      "pk": 2,
+      "fields": {
+        "name": "Security Personnel",
+        "description": "Monitoreo y control de accesos, gestión de incidentes",
+        "created_at": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "model": "authentication.role",
+      "pk": 3,
+      "fields": {
+        "name": "Security Supervisor",
+        "description": "Gestión de rondas de vigilancia y personal de seguridad",
+        "created_at": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "model": "authentication.role",
+      "pk": 4,
+      "fields": {
+        "name": "Receptionist",
+        "description": "Registro de visitantes y gestión de accesos temporales",
+        "created_at": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "model": "authentication.role",
+      "pk": 5,
+      "fields": {
+        "name": "User",
+        "description": "Acceso básico al sistema para empleados o residentes",
+        "created_at": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "model": "authentication.role",
+      "pk": 6,
+      "fields": {
+        "name": "HR Manager",
+        "description": "Acceso a reportes de asistencia y puntualidad",
+        "created_at": "2023-01-01T00:00:00Z"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 1,
+      "fields": {
+        "name": "Administrar usuarios",
+        "code": "manage_users",
+        "description": "Crear, editar y eliminar usuarios"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 2,
+      "fields": {
+        "name": "Administrar accesos",
+        "code": "manage_access",
+        "description": "Gestionar zonas y puntos de acceso"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 3,
+      "fields": {
+        "name": "Monitoreo en tiempo real",
+        "code": "monitor_access",
+        "description": "Ver accesos en tiempo real"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 4,
+      "fields": {
+        "name": "Registrar visitantes",
+        "code": "register_visitors",
+        "description": "Registrar nuevos visitantes y generar accesos"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 5,
+      "fields": {
+        "name": "Gestionar incidentes",
+        "code": "manage_incidents",
+        "description": "Crear y gestionar incidentes de seguridad"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 6,
+      "fields": {
+        "name": "Acceso a reportes",
+        "code": "access_reports",
+        "description": "Generar y ver reportes del sistema"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 7,
+      "fields": {
+        "name": "Gestionar estacionamiento",
+        "code": "manage_parking",
+        "description": "Administrar accesos a estacionamiento"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 8,
+      "fields": {
+        "name": "Bloquear/desbloquear accesos",
+        "code": "lock_unlock_access",
+        "description": "Control remoto de puntos de acceso"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 9,
+      "fields": {
+        "name": "Gestionar rondas",
+        "code": "manage_rounds",
+        "description": "Programar y supervisar rondas de vigilancia"
+      }
+    },
+    {
+      "model": "authentication.permission",
+      "pk": 10,
+      "fields": {
+        "name": "Activar protocolos de emergencia",
+        "code": "activate_emergency",
+        "description": "Activar y gestionar protocolos de emergencia"
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 1,
+      "fields": {
+        "role": 1,
+        "permission": 1
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 2,
+      "fields": {
+        "role": 1,
+        "permission": 2
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 3,
+      "fields": {
+        "role": 1,
+        "permission": 3
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 4,
+      "fields": {
+        "role": 1,
+        "permission": 4
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 5,
+      "fields": {
+        "role": 1,
+        "permission": 5
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 6,
+      "fields": {
+        "role": 1,
+        "permission": 6
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 7,
+      "fields": {
+        "role": 1,
+        "permission": 7
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 8,
+      "fields": {
+        "role": 1,
+        "permission": 8
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 9,
+      "fields": {
+        "role": 1,
+        "permission": 9
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 10,
+      "fields": {
+        "role": 1,
+        "permission": 10
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 11,
+      "fields": {
+        "role": 2,
+        "permission": 3
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 12,
+      "fields": {
+        "role": 2,
+        "permission": 5
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 13,
+      "fields": {
+        "role": 2,
+        "permission": 8
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 14,
+      "fields": {
+        "role": 2,
+        "permission": 10
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 15,
+      "fields": {
+        "role": 3,
+        "permission": 3
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 16,
+      "fields": {
+        "role": 3,
+        "permission": 5
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 17,
+      "fields": {
+        "role": 3,
+        "permission": 6
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 18,
+      "fields": {
+        "role": 3,
+        "permission": 8
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 19,
+      "fields": {
+        "role": 3,
+        "permission": 9
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 20,
+      "fields": {
+        "role": 3,
+        "permission": 10
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 21,
+      "fields": {
+        "role": 4,
+        "permission": 4
+      }
+    },
+    {
+      "model": "authentication.rolepermission",
+      "pk": 22,
+      "fields": {
+        "role": 6,
+        "permission": 6
+      }
+    }
+  ]
