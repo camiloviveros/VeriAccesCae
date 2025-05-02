@@ -69,6 +69,13 @@ class AccessLog(models.Model):
         return f"{self.user.username if self.user else 'Unknown'} - {self.access_point.name} - {self.timestamp}"
 
 class Visitor(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('inside', 'Dentro'),
+        ('outside', 'Fuera'),
+        ('denied', 'Denegado')
+    ]
+    
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     id_number = models.CharField(max_length=50)
@@ -77,6 +84,11 @@ class Visitor(models.Model):
     company = models.CharField(max_length=100, blank=True)
     photo = models.ImageField(upload_to='visitor_photos/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    visitor_type = models.CharField(max_length=50, blank=True, null=True)
+    apartment_number = models.CharField(max_length=50, blank=True, null=True)
+    entry_date = models.DateTimeField(blank=True, null=True)
+    exit_date = models.DateTimeField(blank=True, null=True)
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

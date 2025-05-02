@@ -99,7 +99,9 @@ class AccessLogSerializer(serializers.ModelSerializer):
 class VisitorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Visitor
-        fields = ['id', 'first_name', 'last_name', 'id_number', 'phone', 'email', 'company', 'photo', 'created_at']
+        fields = ['id', 'first_name', 'last_name', 'id_number', 'phone', 'email', 
+                 'company', 'photo', 'created_at', 'status', 'visitor_type', 
+                 'apartment_number', 'entry_date', 'exit_date']
 
 class VisitorAccessSerializer(serializers.ModelSerializer):
     visitor_detail = serializers.SerializerMethodField()

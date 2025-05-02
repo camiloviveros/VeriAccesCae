@@ -289,8 +289,54 @@ class VisitorViewSet(viewsets.ModelViewSet):
     queryset = Visitor.objects.all()
     serializer_class = VisitorSerializer
     permission_classes = [IsAuthenticated]
-    filterset_fields = ['first_name', 'last_name', 'id_number', 'company']
+    filterset_fields = ['first_name', 'last_name', 'id_number', 'company', 'status']
     search_fields = ['first_name', 'last_name', 'id_number', 'company', 'email']
+
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        """
+        Actualiza el estado de un visitante (pending, inside, outside, denied)
+        """
+        try:
+            visitor = self.get_object()
+            status_value = request.data.get('status')
+            
+            if status_value not in ['pending', 'inside', 'outside', 'denied']:
+                return Response(
+                    {'error': 'Estado no válido. Use: pending, inside, outside, denied'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            visitor.status = status_value
+            visitor.save()
+            
+            serializer = self.get_serializer(visitor)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def update(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método update para manejar actualizaciones de estado
+        """
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # Log de actualización para depuración
+        print(f"Visitante actualizado: {instance.id} - {instance.first_name} {instance.last_name} - Estado: {instance.status}")
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
 
 class VisitorAccessViewSet(viewsets.ModelViewSet):
     """
