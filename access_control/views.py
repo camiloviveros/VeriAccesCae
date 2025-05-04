@@ -88,6 +88,31 @@ class AccessPointViewSet(viewsets.ModelViewSet):
             'is_at_capacity': access_point.current_count >= access_point.max_capacity if access_point.max_capacity > 0 else False
         })
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método de eliminación para mejorar el manejo de errores
+        """
+        try:
+            instance = self.get_object()
+            # Registrar la eliminación para depuración
+            print(f"Eliminando punto de acceso: {instance.id} - {instance.name}")
+            
+            # Realizar la eliminación
+            self.perform_destroy(instance)
+            
+            # Registrar éxito
+            print(f"Punto de acceso eliminado correctamente: {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Registrar el error detallado
+            print(f"Error al eliminar punto de acceso: {e}")
+            # Devolver una respuesta detallada de error
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 class AccessZoneViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar zonas de acceso.
@@ -121,6 +146,31 @@ class AccessZoneViewSet(viewsets.ModelViewSet):
             'max_capacity': zone.max_capacity,
             'is_at_capacity': zone.current_count >= zone.max_capacity if zone.max_capacity > 0 else False
         })
+        
+    def destroy(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método de eliminación para mejorar el manejo de errores
+        """
+        try:
+            instance = self.get_object()
+            # Registrar la eliminación para depuración
+            print(f"Eliminando zona de acceso: {instance.id} - {instance.name}")
+            
+            # Realizar la eliminación
+            self.perform_destroy(instance)
+            
+            # Registrar éxito
+            print(f"Zona de acceso eliminada correctamente: {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Registrar el error detallado
+            print(f"Error al eliminar zona de acceso: {e}")
+            # Devolver una respuesta detallada de error
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class AccessCardViewSet(viewsets.ModelViewSet):
     """
@@ -167,6 +217,31 @@ class AccessCardViewSet(viewsets.ModelViewSet):
         card.save()
         serializer = self.get_serializer(card)
         return Response(serializer.data)
+        
+    def destroy(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método de eliminación para mejorar el manejo de errores
+        """
+        try:
+            instance = self.get_object()
+            # Registrar la eliminación para depuración
+            print(f"Eliminando tarjeta de acceso: {instance.id} - {instance.card_id}")
+            
+            # Realizar la eliminación
+            self.perform_destroy(instance)
+            
+            # Registrar éxito
+            print(f"Tarjeta de acceso eliminada correctamente: {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Registrar el error detallado
+            print(f"Error al eliminar tarjeta de acceso: {e}")
+            # Devolver una respuesta detallada de error
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class AccessPermissionViewSet(viewsets.ModelViewSet):
     """
@@ -233,6 +308,31 @@ class AccessPermissionViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': 'Zona no encontrada'}, 
                 status=status.HTTP_404_NOT_FOUND
+            )
+            
+    def destroy(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método de eliminación para mejorar el manejo de errores
+        """
+        try:
+            instance = self.get_object()
+            # Registrar la eliminación para depuración
+            print(f"Eliminando permiso de acceso: {instance.id} - Usuario: {instance.user.username} - Zona: {instance.zone.name}")
+            
+            # Realizar la eliminación
+            self.perform_destroy(instance)
+            
+            # Registrar éxito
+            print(f"Permiso de acceso eliminado correctamente: {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Registrar el error detallado
+            print(f"Error al eliminar permiso de acceso: {e}")
+            # Devolver una respuesta detallada de error
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class AccessLogViewSet(viewsets.ReadOnlyModelViewSet):
@@ -337,6 +437,39 @@ class VisitorViewSet(viewsets.ModelViewSet):
             instance._prefetched_objects_cache = {}
 
         return Response(serializer.data)
+        
+    def destroy(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método de eliminación para mejorar el manejo de errores
+        """
+        try:
+            instance = self.get_object()
+            # Registrar la eliminación para depuración
+            print(f"Eliminando visitante: {instance.id} - {instance.first_name} {instance.last_name}")
+            
+            # Si el visitante está dentro, actualizar contadores
+            if hasattr(instance, 'status') and instance.status == 'inside':
+                # Actualizar zonas de acceso si es necesario
+                for zone in AccessZone.objects.all():
+                    if zone.current_count > 0:
+                        zone.current_count -= 1
+                        zone.save()
+            
+            # Realizar la eliminación
+            self.perform_destroy(instance)
+            
+            # Registrar éxito
+            print(f"Visitante eliminado correctamente: {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Registrar el error detallado
+            print(f"Error al eliminar visitante: {e}")
+            # Devolver una respuesta detallada de error
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class VisitorAccessViewSet(viewsets.ModelViewSet):
     """
@@ -507,4 +640,29 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             return Response(
                 {'valid': False, 'reason': 'Código QR no válido'}, 
                 status=status.HTTP_400_BAD_REQUEST
+            )
+            
+    def destroy(self, request, *args, **kwargs):
+        """
+        Sobrescribe el método de eliminación para mejorar el manejo de errores
+        """
+        try:
+            instance = self.get_object()
+            # Registrar la eliminación para depuración
+            print(f"Eliminando acceso de visitante: {instance.id} - Visitante: {instance.visitor.first_name} {instance.visitor.last_name}")
+            
+            # Realizar la eliminación
+            self.perform_destroy(instance)
+            
+            # Registrar éxito
+            print(f"Acceso de visitante eliminado correctamente: {instance.id}")
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            # Registrar el error detallado
+            print(f"Error al eliminar acceso de visitante: {e}")
+            # Devolver una respuesta detallada de error
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
