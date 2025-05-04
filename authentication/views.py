@@ -223,3 +223,7 @@ class RegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def head(self, request):
+        # Para peticiones HEAD simplemente devuelve una respuesta exitosa sin cuerpo
+        return Response(status=status.HTTP_200_OK)
