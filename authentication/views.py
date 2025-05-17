@@ -132,7 +132,7 @@ class UserViewSet(viewsets.ModelViewSet):
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser]  # Solo administradores pueden gestionar usuarios
     filterset_fields = ['username', 'email', 'is_active', 'profile__role']
     search_fields = ['username', 'email', 'first_name', 'last_name']
     
@@ -190,18 +190,19 @@ class RegisterView(APIView):
             # Crear perfil de usuario si no existe
             profile, created = UserProfile.objects.get_or_create(user=user)
             
-            # Intentar asignar rol básico de 'User'
+            # Asignar rol de "Usuario" común
             try:
-                basic_role = Role.objects.get(name='User')
-                profile.role = basic_role
+                # Buscar el rol de "Usuario" para usuarios normales
+                regular_role = Role.objects.get(name='Usuario')
+                profile.role = regular_role
                 profile.save()
             except Role.DoesNotExist:
-                # Si no existe el rol "User", crearlo
-                basic_role = Role.objects.create(
-                    name='User',
+                # Si no existe el rol "Usuario", crearlo
+                regular_role = Role.objects.create(
+                    name='Usuario',
                     description='Usuario regular del sistema con acceso básico'
                 )
-                profile.role = basic_role
+                profile.role = regular_role
                 profile.save()
             
             # Generar tokens para logeo automático después del registro
@@ -216,8 +217,8 @@ class RegisterView(APIView):
                     'username': user.username,
                     'email': user.email,
                     'role': {
-                        'id': basic_role.id,
-                        'name': basic_role.name
+                        'id': regular_role.id,
+                        'name': regular_role.name
                     }
                 }
             }, status=status.HTTP_201_CREATED)
@@ -227,3 +228,53 @@ class RegisterView(APIView):
     def head(self, request):
         # Para peticiones HEAD simplemente devuelve una respuesta exitosa sin cuerpo
         return Response(status=status.HTTP_200_OK)
+
+class CreateAdminUserView(APIView):
+    """
+    API endpoint para crear usuarios administrativos.
+    Solo puede ser usado por superusuarios.
+    """
+    permission_classes = [IsAdminUser]
+    
+    def post(self, request):
+        # Verificar que el usuario que hace la solicitud es superusuario
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Solo los superusuarios pueden crear usuarios administrativos'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            
+            # Crear perfil de usuario si no existe
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            
+            # Asignar rol "Administrativo"
+            try:
+                admin_role = Role.objects.get(name='Administrativo')
+            except Role.DoesNotExist:
+                # Si no existe el rol "Administrativo", crearlo
+                admin_role = Role.objects.create(
+                    name='Administrativo',
+                    description='Usuario administrativo con acceso al panel de control'
+                )
+            
+            profile.role = admin_role
+            profile.save()
+            
+            return Response({
+                'detail': 'Usuario administrativo creado correctamente',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'role': {
+                        'id': admin_role.id,
+                        'name': admin_role.name
+                    }
+                }
+            }, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
