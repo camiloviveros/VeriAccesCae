@@ -560,26 +560,26 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             if visitor_access.is_used:
                 return Response(
                     {'valid': False, 'reason': 'El código QR ya ha sido utilizado'}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_200_OK
                 )
                 
             if now < visitor_access.valid_from:
                 return Response(
                     {'valid': False, 'reason': 'El acceso aún no es válido'}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_200_OK
                 )
                 
             if now > visitor_access.valid_to:
                 return Response(
                     {'valid': False, 'reason': 'El acceso ha expirado'}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_200_OK
                 )
             
             # Verificar que el punto de acceso esté en una zona permitida
             if not visitor_access.access_zones.filter(access_points=access_point).exists():
                 return Response(
                     {'valid': False, 'reason': 'Punto de acceso no autorizado para este visitante'}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_200_OK
                 )
             
             # Verificar aforo si es necesario
@@ -595,12 +595,18 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                 
                 return Response(
                     {'valid': False, 'reason': 'Capacidad máxima alcanzada'}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    status=status.HTTP_200_OK
                 )
             
             # Acceso válido - Marcar como usado para evitar re-uso
             visitor_access.is_used = True
             visitor_access.save()
+            
+            # Actualizar estado del visitante a "inside"
+            visitor = visitor_access.visitor
+            visitor.status = 'inside'
+            visitor.entry_date = now
+            visitor.save()
             
             # Registrar acceso
             AccessLog.objects.create(
@@ -629,17 +635,17 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                     'host': f"{visitor_access.host.first_name} {visitor_access.host.last_name}",
                     'purpose': visitor_access.purpose
                 }
-            })
+            }, status=status.HTTP_200_OK)
             
         except AccessPoint.DoesNotExist:
             return Response(
-                {'error': 'Punto de acceso no encontrado'}, 
-                status=status.HTTP_404_NOT_FOUND
+                {'valid': False, 'reason': 'Punto de acceso no encontrado'}, 
+                status=status.HTTP_200_OK
             )
         except VisitorAccess.DoesNotExist:
             return Response(
                 {'valid': False, 'reason': 'Código QR no válido'}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_200_OK
             )
             
     def destroy(self, request, *args, **kwargs):
