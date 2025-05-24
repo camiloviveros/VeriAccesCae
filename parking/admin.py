@@ -16,10 +16,11 @@ class ParkingAreaAdmin(admin.ModelAdmin):
 
 @admin.register(Vehicle)
 class VehicleAdmin(admin.ModelAdmin):
-    list_display = ['license_plate', 'user', 'brand', 'model', 'color', 'is_active']
-    list_filter = ['is_active', 'brand']
+    list_display = ['license_plate', 'user', 'brand', 'model', 'color', 'parking_area', 'is_active', 'created_at']
+    list_filter = ['is_active', 'brand', 'parking_area', 'created_at']
     search_fields = ['license_plate', 'brand', 'model', 'user__username']
-    readonly_fields = ['user']
+    readonly_fields = ['user', 'created_at', 'updated_at']
+    date_hierarchy = 'created_at'
 
 
 @admin.register(ParkingAccess)

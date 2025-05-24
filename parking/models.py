@@ -10,6 +10,12 @@ class ParkingArea(models.Model):
     
     def __str__(self):
         return self.name
+    
+    def available_spots(self):
+        return self.max_capacity - self.current_count
+    
+    def is_full(self):
+        return self.current_count >= self.max_capacity
 
 class Vehicle(models.Model):
     user = models.ForeignKey(User, related_name='vehicles', on_delete=models.CASCADE)
@@ -17,13 +23,21 @@ class Vehicle(models.Model):
     brand = models.CharField(max_length=50)
     model = models.CharField(max_length=50)
     color = models.CharField(max_length=30)
-    is_active = models.BooleanField(default=True)
+    parking_area = models.ForeignKey(
+        ParkingArea, 
+        related_name='vehicles', 
+        on_delete=models.PROTECT,
+        help_text='Área de estacionamiento asignada'
+    )
+    is_active = models.BooleanField(default=True, help_text='Indica si el vehículo está dentro del área')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         unique_together = ('user', 'license_plate')
     
     def __str__(self):
-        return f"{self.license_plate} - {self.user.username}"
+        return f"{self.license_plate} - {self.user.username} ({self.parking_area.name})"
 
 class ParkingAccess(models.Model):
     vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE)

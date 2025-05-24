@@ -24,16 +24,17 @@ class ParkingAreaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         # Filtrar solo áreas activas por defecto
-        if not self.request.user.is_staff:
+        active_only = self.request.query_params.get('active_only', 'false')
+        if active_only.lower() == 'true' or not self.request.user.is_staff:
             queryset = queryset.filter(is_active=True)
-        return queryset
+        return queryset.order_by('name')
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Obtener estadísticas generales del estacionamiento"""
         areas = self.get_queryset()
-        total_capacity = areas.aggregate(total=Count('max_capacity'))['total'] or 0
-        current_occupancy = areas.aggregate(total=Count('current_count'))['total'] or 0
+        total_capacity = sum(area.max_capacity for area in areas)
+        current_occupancy = sum(area.current_count for area in areas)
         
         area_stats = []
         for area in areas:
@@ -62,7 +63,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Filtrar vehículos por usuario si no es admin
         user = self.request.user
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related('user', 'parking_area')
         
         if user.is_staff or user.is_superuser:
             # Los admins pueden ver todos los vehículos
@@ -83,21 +84,77 @@ class VehicleViewSet(viewsets.ModelViewSet):
         license_plate = self.request.query_params.get('license_plate', None)
         if license_plate:
             queryset = queryset.filter(license_plate__icontains=license_plate)
-            
-        return queryset.order_by('-id')
-    
-    def perform_create(self, serializer):
-        # Automáticamente asignar el usuario actual al crear un vehículo
-        serializer.save(user=self.request.user)
         
+        # Filtrar por área de estacionamiento
+        parking_area_id = self.request.query_params.get('parking_area_id', None)
+        if parking_area_id:
+            queryset = queryset.filter(parking_area_id=parking_area_id)
+            
+        return queryset.order_by('-created_at')
+    
+    @transaction.atomic
+    def perform_create(self, serializer):
+        """Crear vehículo y actualizar contador del área"""
+        # Automáticamente asignar el usuario actual al crear un vehículo
+        vehicle = serializer.save(user=self.request.user)
+        
+        # Incrementar contador del área de estacionamiento
+        parking_area = vehicle.parking_area
+        parking_area.current_count = F('current_count') + 1
+        parking_area.save()
+        
+        # Actualizar el objeto para obtener el valor real
+        parking_area.refresh_from_db()
+        
+        # Crear acceso automático al área asignada
+        ParkingAccess.objects.get_or_create(
+            vehicle=vehicle,
+            parking_area=parking_area,
+            defaults={'valid_from': timezone.now().date()}
+        )
+        
+    @transaction.atomic
     def perform_update(self, serializer):
+        """Actualizar vehículo y manejar cambio de área"""
+        old_instance = self.get_object()
+        old_parking_area = old_instance.parking_area
+        
         # Asegurar que no se pueda cambiar el usuario propietario
         if 'user' in serializer.validated_data:
             del serializer.validated_data['user']
-        serializer.save()
+            
+        updated_vehicle = serializer.save()
+        new_parking_area = updated_vehicle.parking_area
+        
+        # Si cambió el área de estacionamiento
+        if old_parking_area != new_parking_area:
+            # Decrementar contador del área anterior
+            old_parking_area.current_count = F('current_count') - 1
+            old_parking_area.save()
+            
+            # Incrementar contador del área nueva
+            new_parking_area.current_count = F('current_count') + 1
+            new_parking_area.save()
+            
+            # Crear nuevo acceso y desactivar el anterior si existe
+            old_access = ParkingAccess.objects.filter(
+                vehicle=updated_vehicle,
+                parking_area=old_parking_area
+            ).first()
+            if old_access:
+                old_access.valid_to = timezone.now().date()
+                old_access.save()
+            
+            # Crear nuevo acceso
+            ParkingAccess.objects.get_or_create(
+                vehicle=updated_vehicle,
+                parking_area=new_parking_area,
+                defaults={'valid_from': timezone.now().date()}
+            )
     
+    @transaction.atomic
     def destroy(self, request, *args, **kwargs):
-        """Override destroy to add custom logic"""
+        """Override destroy para manejar contadores y permisos"""
         instance = self.get_object()
         
         # Verificar permisos - solo el propietario o admin puede eliminar
@@ -107,32 +164,48 @@ class VehicleViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Verificar si el vehículo tiene accesos activos
-        active_accesses = ParkingAccess.objects.filter(
-            vehicle=instance,
-            valid_from__lte=timezone.now().date()
-        ).filter(
-            Q(valid_to__isnull=True) | Q(valid_to__gte=timezone.now().date())
-        )
+        # Guardar referencia al área antes de eliminar
+        parking_area = instance.parking_area
         
-        if active_accesses.exists():
-            return Response(
-                {'error': 'No se puede eliminar el vehículo porque tiene accesos activos'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+        # Eliminar el vehículo
         self.perform_destroy(instance)
+        
+        # Decrementar contador del área de estacionamiento
+        if parking_area.current_count > 0:
+            parking_area.current_count = F('current_count') - 1
+            parking_area.save()
+        
         return Response(status=status.HTTP_204_NO_CONTENT)
     
     @action(detail=True, methods=['post'])
     def toggle_active(self, request, pk=None):
-        """Activar/desactivar un vehículo"""
+        """Activar/desactivar un vehículo (marcar dentro/fuera del área)"""
         vehicle = self.get_object()
+        
+        # Verificar permisos
+        if not request.user.is_staff and vehicle.user != request.user:
+            return Response(
+                {'error': 'No tienes permiso para cambiar el estado de este vehículo'}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         vehicle.is_active = not vehicle.is_active
         vehicle.save()
+        
+        # Registrar en el log
+        direction = 'in' if vehicle.is_active else 'out'
+        ParkingLog.objects.create(
+            vehicle=vehicle,
+            parking_area=vehicle.parking_area,
+            direction=direction,
+            status='granted',
+            reason=f'Cambio manual de estado por {request.user.username}'
+        )
+        
         return Response({
             'status': 'success',
-            'is_active': vehicle.is_active
+            'is_active': vehicle.is_active,
+            'message': f'Vehículo marcado como {"adentro" if vehicle.is_active else "afuera"}'
         })
 
 
@@ -328,10 +401,6 @@ def register_entry(request):
             status='granted'
         )
         
-        # Actualizar contador
-        parking_area.current_count = F('current_count') + 1
-        parking_area.save()
-        
         return Response({
             'status': 'granted',
             'log_id': log.id,
@@ -378,11 +447,6 @@ def register_exit(request):
             direction='out',
             status='granted'
         )
-        
-        # Actualizar contador (asegurar que no sea negativo)
-        if parking_area.current_count > 0:
-            parking_area.current_count = F('current_count') - 1
-            parking_area.save()
         
         return Response({
             'status': 'granted',
