@@ -13,23 +13,21 @@ from .views import (
     RegisterView
 )
 
-# Configuración del router para viewsets
+
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
 router.register(r'roles', RoleViewSet)
 router.register(r'permissions', PermissionViewSet)
 
 urlpatterns = [
-    # Autenticación
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('change-password/', ChangePasswordView.as_view(), name='change_password'),
      path('register/', RegisterView.as_view(), name='register'),
     
-    # Usuario actual
     path('me/', CurrentUserView.as_view(), name='current_user'),
     
-    # Incluir todas las rutas del router
+
     path('', include(router.urls)),
 ]

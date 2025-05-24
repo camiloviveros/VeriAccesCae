@@ -36,7 +36,7 @@ class User(AbstractUser):
         self.last_login_attempt = timezone.now()
         if not success:
             self.login_attempts += 1
-            if self.login_attempts >= 5:  # Bloqueo tras 5 intentos fallidos
+            if self.login_attempts >= 5:  
                 self.is_locked = True
         else:
             self.login_attempts = 0
