@@ -71,6 +71,7 @@ class AccessLog(models.Model):
 class Visitor(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pendiente'),
+        ('approved', 'Aprobado'),  # Nuevo estado
         ('inside', 'Dentro'),
         ('outside', 'Fuera'),
         ('denied', 'Denegado')
