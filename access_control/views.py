@@ -400,11 +400,17 @@ class VisitorViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar visitantes.
     """
-    queryset = Visitor.objects.all()
+    queryset = Visitor.objects.all().order_by('-created_at')
     serializer_class = VisitorSerializer
     permission_classes = [IsAuthenticated]
-    filterset_fields = ['first_name', 'last_name', 'id_number', 'company', 'status']
-    search_fields = ['first_name', 'last_name', 'id_number', 'company', 'email']
+    filterset_fields = ['first_name', 'last_name', 'id_number', 'company', 'status', 'created_by']
+    search_fields = ['first_name', 'last_name', 'id_number', 'company', 'email', 'description']
+
+    def perform_create(self, serializer):
+        """
+        Guardar el usuario que crea el visitante
+        """
+        serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
@@ -519,7 +525,7 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar accesos de visitantes.
     """
-    queryset = VisitorAccess.objects.all()
+    queryset = VisitorAccess.objects.all().order_by('-created_at') 
     serializer_class = VisitorAccessSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ['visitor', 'host', 'is_used']
@@ -612,13 +618,7 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             
             now = timezone.now()
             
-            # Verificar que el QR no haya sido usado previamente
-            if visitor_access.is_used:
-                return Response(
-                    {'valid': False, 'reason': 'El código QR ya ha sido utilizado'}, 
-                    status=status.HTTP_200_OK
-                )
-                
+            # Verificar validez temporal
             if now < visitor_access.valid_from:
                 return Response(
                     {'valid': False, 'reason': 'El acceso aún no es válido'}, 
@@ -632,7 +632,7 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                 )
             
             # Verificar que el visitante esté aprobado
-            if visitor_access.visitor.status != 'approved':
+            if visitor_access.visitor.status not in ['approved', 'outside']:
                 return Response(
                     {'valid': False, 'reason': 'El visitante no está aprobado'}, 
                     status=status.HTTP_200_OK
@@ -661,10 +661,6 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                     {'valid': False, 'reason': 'Capacidad máxima alcanzada'}, 
                     status=status.HTTP_200_OK
                 )
-            
-            # Acceso válido - Marcar como usado
-            visitor_access.is_used = True
-            visitor_access.save()
             
             # Actualizar estado del visitante a "inside"
             visitor = visitor_access.visitor

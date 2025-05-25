@@ -36,7 +36,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Los usuarios normales solo ven sus propias notificaciones
         if self.request.user.is_staff or self.request.user.is_superuser:
-            return Notification.objects.all()
+            return Notification.objects.all().order_by('-created_at')
         return Notification.objects.filter(recipient=self.request.user)
 
 class NotificationPreferenceViewSet(viewsets.ModelViewSet):

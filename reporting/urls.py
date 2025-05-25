@@ -25,7 +25,7 @@ class ReportScheduleSerializer(serializers.ModelSerializer):
 
 # ViewSets
 class ReportViewSet(viewsets.ModelViewSet):
-    queryset = Report.objects.all()
+    queryset = Report.objects.all().order_by('-created_at')
     serializer_class = ReportSerializer
     permission_classes = [IsAuthenticated]
 

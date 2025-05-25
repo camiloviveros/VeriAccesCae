@@ -98,11 +98,24 @@ class AccessLogSerializer(serializers.ModelSerializer):
         }
 
 class VisitorSerializer(serializers.ModelSerializer):
+    created_by_detail = serializers.SerializerMethodField()
+    
     class Meta:
         model = Visitor
         fields = ['id', 'first_name', 'last_name', 'id_number', 'phone', 'email', 
                  'company', 'photo', 'created_at', 'status', 'visitor_type', 
-                 'apartment_number', 'entry_date', 'exit_date']
+                 'apartment_number', 'entry_date', 'exit_date', 'description', 
+                 'created_by', 'created_by_detail']
+        read_only_fields = ['created_by']
+    
+    def get_created_by_detail(self, obj):
+        if obj.created_by:
+            return {
+                'id': obj.created_by.id,
+                'username': obj.created_by.username,
+                'full_name': f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+            }
+        return None
 
 class VisitorAccessSerializer(serializers.ModelSerializer):
     visitor_detail = serializers.SerializerMethodField()

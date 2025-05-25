@@ -47,7 +47,7 @@ class SecurityRoundExecutionSerializer(serializers.ModelSerializer):
 
 # ViewSets
 class SecurityIncidentViewSet(viewsets.ModelViewSet):
-    queryset = SecurityIncident.objects.all()
+    queryset = SecurityIncident.objects.all().order_by('-created_at')
     serializer_class = SecurityIncidentSerializer
     permission_classes = [IsAuthenticated]
 

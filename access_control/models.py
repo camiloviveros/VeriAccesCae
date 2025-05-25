@@ -90,6 +90,8 @@ class Visitor(models.Model):
     apartment_number = models.CharField(max_length=50, blank=True, null=True)
     entry_date = models.DateTimeField(blank=True, null=True)
     exit_date = models.DateTimeField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)  # NUEVO CAMPO
+    created_by = models.ForeignKey(User, related_name='created_visitors', on_delete=models.SET_NULL, null=True, blank=True)  # NUEVO CAMPO
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
