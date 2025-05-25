@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.db.models import Q
 import datetime
 import uuid
+import json
 
 from authentication.models import User
 from .models import (
@@ -15,7 +16,8 @@ from .models import (
     AccessPermission, 
     AccessLog, 
     Visitor, 
-    VisitorAccess
+    VisitorAccess,
+    BuildingOccupancy
 )
 from .serializers import (
     AccessPointSerializer,
@@ -24,7 +26,8 @@ from .serializers import (
     AccessPermissionSerializer,
     AccessLogSerializer,
     VisitorSerializer,
-    VisitorAccessSerializer
+    VisitorAccessSerializer,
+    BuildingOccupancySerializer
 )
 from .permissions import IsSecurityPersonnel, IsReceptionist, IsAdministrator
 from django.shortcuts import get_object_or_404
@@ -32,6 +35,7 @@ import qrcode
 import io
 import base64
 from django.core.files.base import ContentFile
+from rest_framework.exceptions import ValidationError
 
 class AccessPointViewSet(viewsets.ModelViewSet):
     """
@@ -362,6 +366,16 @@ class AccessLogViewSet(viewsets.ReadOnlyModelViewSet):
             return AccessLog.objects.filter(user=user).order_by('-timestamp')
     
     @action(detail=False, methods=['get'])
+    def recent(self, request):
+        """
+        Obtiene los registros de acceso más recientes (últimos 10).
+        """
+        limit = int(request.query_params.get('limit', 10))
+        logs = self.get_queryset()[:limit]
+        serializer = self.get_serializer(logs, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
     def live_feed(self, request):
         """
         Obtiene los registros de acceso más recientes para monitoreo en tiempo real.
@@ -395,17 +409,30 @@ class VisitorViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
         """
-        Actualiza el estado de un visitante (pending, inside, outside, denied)
+        Actualiza el estado de un visitante (pending, approved, inside, outside, denied)
         """
         try:
             visitor = self.get_object()
             status_value = request.data.get('status')
             
-            if status_value not in ['pending', 'inside', 'outside', 'denied']:
+            if status_value not in ['pending', 'approved', 'inside', 'outside', 'denied']:
                 return Response(
-                    {'error': 'Estado no válido. Use: pending, inside, outside, denied'},
+                    {'error': 'Estado no válido. Use: pending, approved, inside, outside, denied'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Si se está cambiando a 'inside', actualizar el aforo
+            if status_value == 'inside' and visitor.status != 'inside':
+                occupancy = BuildingOccupancy.get_current()
+                occupancy.visitors_count += 1
+                occupancy.save()
+            
+            # Si se está cambiando de 'inside' a otro estado, actualizar el aforo
+            elif visitor.status == 'inside' and status_value != 'inside':
+                occupancy = BuildingOccupancy.get_current()
+                if occupancy.visitors_count > 0:
+                    occupancy.visitors_count -= 1
+                    occupancy.save()
             
             visitor.status = status_value
             visitor.save()
@@ -424,9 +451,26 @@ class VisitorViewSet(viewsets.ModelViewSet):
         """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+        
+        # Guardar el estado anterior
+        old_status = instance.status
+        
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
+
+        # Actualizar aforo si cambió el estado
+        new_status = instance.status
+        if old_status != new_status:
+            occupancy = BuildingOccupancy.get_current()
+            
+            if new_status == 'inside' and old_status != 'inside':
+                occupancy.visitors_count += 1
+                occupancy.save()
+            elif old_status == 'inside' and new_status != 'inside':
+                if occupancy.visitors_count > 0:
+                    occupancy.visitors_count -= 1
+                    occupancy.save()
 
         # Log de actualización para depuración
         print(f"Visitante actualizado: {instance.id} - {instance.first_name} {instance.last_name} - Estado: {instance.status}")
@@ -444,16 +488,16 @@ class VisitorViewSet(viewsets.ModelViewSet):
         """
         try:
             instance = self.get_object()
+            
+            # No permitir eliminar si el visitante está dentro
+            if instance.status == 'inside':
+                return Response(
+                    {'error': 'No se puede eliminar un visitante que está dentro del edificio'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             # Registrar la eliminación para depuración
             print(f"Eliminando visitante: {instance.id} - {instance.first_name} {instance.last_name}")
-            
-            # Si el visitante está dentro, actualizar contadores
-            if hasattr(instance, 'status') and instance.status == 'inside':
-                # Actualizar zonas de acceso si es necesario
-                for zone in AccessZone.objects.all():
-                    if zone.current_count > 0:
-                        zone.current_count -= 1
-                        zone.save()
             
             # Realizar la eliminación
             self.perform_destroy(instance)
@@ -484,10 +528,16 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
         """
         Al crear un nuevo acceso de visitante, generar el código QR
         """
-        # Generar un identificador único para el QR
+        visitor = serializer.validated_data.get('visitor')
+        
+        # Verificar que el visitante esté aprobado
+        if visitor.status != 'approved':
+            raise ValidationError('El visitante debe estar aprobado para generar QR')
+        
+        # Generar QR único
         qr_code = str(uuid.uuid4())
         
-        # Guardar con el QR code
+        # Crear el acceso
         serializer.save(
             qr_code=qr_code,
             host=self.request.user if not serializer.validated_data.get('host') else serializer.validated_data.get('host')
@@ -508,17 +558,15 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             border=4,
         )
         
-        # Datos a codificar (incluir información del acceso)
+        # Datos a codificar
         data = {
-            'type': 'visitor_access',
-            'id': visitor_access.id,
-            'qr_code': visitor_access.qr_code,
             'visitor_id': visitor_access.visitor.id,
+            'qr_code': visitor_access.qr_code,
             'valid_from': visitor_access.valid_from.isoformat(),
             'valid_to': visitor_access.valid_to.isoformat()
         }
         
-        qr.add_data(str(data))
+        qr.add_data(json.dumps(data))
         qr.make(fit=True)
         
         # Crear imagen
@@ -548,15 +596,23 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             )
         
         try:
+            # Intentar parsear el QR code
+            try:
+                qr_data = json.loads(qr_code)
+                qr_code_uuid = qr_data.get('qr_code')
+            except:
+                # Si no es JSON, asumir que es el UUID directamente
+                qr_code_uuid = qr_code
+            
             # Verificar que el punto de acceso exista
             access_point = AccessPoint.objects.get(id=access_point_id)
             
             # Buscar el acceso de visitante con ese QR
-            visitor_access = VisitorAccess.objects.get(qr_code=qr_code)
+            visitor_access = VisitorAccess.objects.get(qr_code=qr_code_uuid)
             
             now = timezone.now()
             
-            # Verificar validez
+            # Verificar que el QR no haya sido usado previamente
             if visitor_access.is_used:
                 return Response(
                     {'valid': False, 'reason': 'El código QR ya ha sido utilizado'}, 
@@ -575,6 +631,13 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_200_OK
                 )
             
+            # Verificar que el visitante esté aprobado
+            if visitor_access.visitor.status != 'approved':
+                return Response(
+                    {'valid': False, 'reason': 'El visitante no está aprobado'}, 
+                    status=status.HTTP_200_OK
+                )
+            
             # Verificar que el punto de acceso esté en una zona permitida
             if not visitor_access.access_zones.filter(access_points=access_point).exists():
                 return Response(
@@ -582,12 +645,13 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_200_OK
                 )
             
-            # Verificar aforo si es necesario
-            if access_point.max_capacity > 0 and access_point.current_count >= access_point.max_capacity:
+            # Verificar aforo
+            occupancy = BuildingOccupancy.get_current()
+            if occupancy.total_count >= occupancy.max_capacity:
                 # Registrar intento fallido
                 AccessLog.objects.create(
                     access_point=access_point,
-                    card_id=qr_code,
+                    card_id=qr_code_uuid,
                     status=AccessLog.ACCESS_DENIED,
                     reason='Capacidad máxima alcanzada',
                     direction='in'
@@ -598,7 +662,7 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_200_OK
                 )
             
-            # Acceso válido - Marcar como usado para evitar re-uso
+            # Acceso válido - Marcar como usado
             visitor_access.is_used = True
             visitor_access.save()
             
@@ -608,23 +672,18 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             visitor.entry_date = now
             visitor.save()
             
+            # Actualizar aforo
+            occupancy.visitors_count += 1
+            occupancy.save()
+            
             # Registrar acceso
             AccessLog.objects.create(
                 access_point=access_point,
-                card_id=qr_code,
+                card_id=qr_code_uuid,
                 status=AccessLog.ACCESS_GRANTED,
                 reason='Acceso de visitante autorizado',
                 direction='in'
             )
-            
-            # Actualizar contadores de aforo
-            access_point.current_count += 1
-            access_point.save()
-            
-            for zone in visitor_access.access_zones.all():
-                if zone.access_points.filter(id=access_point.id).exists():
-                    zone.current_count += 1
-                    zone.save()
             
             return Response({
                 'valid': True,
@@ -633,7 +692,9 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
                     'name': f"{visitor_access.visitor.first_name} {visitor_access.visitor.last_name}",
                     'company': visitor_access.visitor.company,
                     'host': f"{visitor_access.host.first_name} {visitor_access.host.last_name}",
-                    'purpose': visitor_access.purpose
+                    'purpose': visitor_access.purpose,
+                    'visitor_type': visitor_access.visitor.visitor_type,
+                    'apartment_number': visitor_access.visitor.apartment_number
                 }
             }, status=status.HTTP_200_OK)
             
@@ -671,4 +732,52 @@ class VisitorAccessViewSet(viewsets.ModelViewSet):
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+# Nuevo ViewSet para BuildingOccupancy
+class BuildingOccupancyViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint para gestionar el aforo del edificio.
+    """
+    queryset = BuildingOccupancy.objects.all()
+    serializer_class = BuildingOccupancySerializer
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """
+        Obtiene el aforo actual del edificio.
+        """
+        occupancy = BuildingOccupancy.get_current()
+        serializer = self.get_serializer(occupancy)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def update_residents(self, request):
+        """
+        Actualiza el conteo de residentes.
+        """
+        residents_count = request.data.get('residents_count')
+        
+        if residents_count is None:
+            return Response(
+                {'error': 'Se requiere residents_count'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            residents_count = int(residents_count)
+            if residents_count < 0:
+                raise ValueError("El conteo no puede ser negativo")
+            
+            occupancy = BuildingOccupancy.get_current()
+            occupancy.residents_count = residents_count
+            occupancy.save()
+            
+            serializer = self.get_serializer(occupancy)
+            return Response(serializer.data)
+        except ValueError as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
             )

@@ -71,7 +71,7 @@ class AccessLog(models.Model):
 class Visitor(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pendiente'),
-        ('approved', 'Aprobado'),  # Nuevo estado
+        ('approved', 'Aprobado'),
         ('inside', 'Dentro'),
         ('outside', 'Fuera'),
         ('denied', 'Denegado')
@@ -107,3 +107,27 @@ class VisitorAccess(models.Model):
     
     def __str__(self):
         return f"{self.visitor} - hosted by {self.host.username}"
+
+# Nuevo modelo para aforo persistente
+class BuildingOccupancy(models.Model):
+    residents_count = models.IntegerField(default=0)
+    visitors_count = models.IntegerField(default=0)
+    max_capacity = models.IntegerField(default=100)
+    last_updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Building Occupancy"
+        verbose_name_plural = "Building Occupancy"
+    
+    def __str__(self):
+        return f"Occupancy: {self.total_count}/{self.max_capacity}"
+    
+    @property
+    def total_count(self):
+        return self.residents_count + self.visitors_count
+    
+    @classmethod
+    def get_current(cls):
+        """Obtiene o crea el registro de aforo actual"""
+        occupancy, created = cls.objects.get_or_create(pk=1)
+        return occupancy

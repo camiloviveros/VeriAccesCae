@@ -8,7 +8,8 @@ from .models import (
     AccessPermission, 
     AccessLog, 
     Visitor, 
-    VisitorAccess
+    VisitorAccess,
+    BuildingOccupancy
 )
 
 class AccessPointSerializer(serializers.ModelSerializer):
@@ -137,12 +138,23 @@ class VisitorAccessSerializer(serializers.ModelSerializer):
         """
         Validar que la fecha de inicio sea anterior a la de fin
         """
-        if data['valid_from'] >= data['valid_to']:
-            raise serializers.ValidationError("La fecha/hora de inicio debe ser anterior a la de fin")
+        if 'valid_from' in data and 'valid_to' in data:
+            if data['valid_from'] >= data['valid_to']:
+                raise serializers.ValidationError("La fecha/hora de inicio debe ser anterior a la de fin")
         
         # Validar que la fecha de fin no sea demasiado lejana (máximo 30 días)
-        max_days = 30
-        if (data['valid_to'] - data['valid_from']).days > max_days:
-            raise serializers.ValidationError(f"El acceso no puede ser válido por más de {max_days} días")
+        if 'valid_from' in data and 'valid_to' in data:
+            max_days = 30
+            if (data['valid_to'] - data['valid_from']).days > max_days:
+                raise serializers.ValidationError(f"El acceso no puede ser válido por más de {max_days} días")
         
         return data
+
+# Nuevo serializer para BuildingOccupancy
+class BuildingOccupancySerializer(serializers.ModelSerializer):
+    total_count = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = BuildingOccupancy
+        fields = ['id', 'residents_count', 'visitors_count', 'total_count', 
+                  'max_capacity', 'last_updated']

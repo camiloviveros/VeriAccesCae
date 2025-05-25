@@ -8,7 +8,8 @@ from .views import (
     AccessPermissionViewSet,
     AccessLogViewSet,
     VisitorViewSet,
-    VisitorAccessViewSet
+    VisitorAccessViewSet,
+    BuildingOccupancyViewSet
 )
 
 # Configuración del router para viewsets
@@ -20,6 +21,7 @@ router.register(r'access-permissions', AccessPermissionViewSet)
 router.register(r'access-logs', AccessLogViewSet)
 router.register(r'visitors', VisitorViewSet)
 router.register(r'visitor-access', VisitorAccessViewSet)
+router.register(r'occupancy', BuildingOccupancyViewSet)
 
 urlpatterns = [
     # Incluir todas las rutas del router
