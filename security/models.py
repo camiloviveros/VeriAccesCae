@@ -1,3 +1,5 @@
+
+
 from django.db import models
 from django.utils import timezone
 from authentication.models import User
@@ -23,6 +25,14 @@ class SecurityIncident(models.Model):
         ('closed', 'Closed')
     ]
     
+    # NUEVO: Tipos de reportes
+    REPORT_TYPE_CHOICES = [
+        ('alert', 'Alerta'),
+        ('emergency', 'Emergencia'),
+        ('incident', 'Incidente'),
+        ('general', 'Reporte General'),
+    ]
+    
     title = models.CharField(max_length=200)
     description = models.TextField()
     location = models.CharField(max_length=200)
@@ -30,12 +40,16 @@ class SecurityIncident(models.Model):
     reported_by = models.ForeignKey(User, related_name='reported_incidents', on_delete=models.CASCADE)
     assigned_to = models.ForeignKey(User, related_name='assigned_incidents', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='new')
+    
+    # NUEVO: Campo para tipo de reporte
+    report_type = models.CharField(max_length=20, choices=REPORT_TYPE_CHOICES, default='incident')
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     resolved_at = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
-        return self.title
+        return f"[{self.report_type.upper()}] {self.title}"
     
     def resolve(self, resolved_by):
         """
@@ -52,7 +66,13 @@ class SecurityIncident(models.Model):
             comment=f"Incidente marcado como resuelto por {resolved_by.get_full_name() or resolved_by.username}",
             is_system_comment=True
         )
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Reporte de Seguridad'
+        verbose_name_plural = 'Reportes de Seguridad'
 
+# Resto de los modelos permanecen igual...
 class IncidentAttachment(models.Model):
     """
     Archivos adjuntos a incidentes de seguridad.

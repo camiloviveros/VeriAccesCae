@@ -1,4 +1,4 @@
-# security/serializers.py
+
 from rest_framework import serializers
 from .models import (
     SecurityIncident, IncidentAttachment, IncidentComment,
@@ -16,13 +16,17 @@ class UserSerializer(serializers.ModelSerializer):
 class SecurityIncidentSerializer(serializers.ModelSerializer):
     reported_by_detail = UserSerializer(source='reported_by', read_only=True)
     assigned_to_detail = UserSerializer(source='assigned_to', read_only=True)
+    report_type_display = serializers.CharField(source='get_report_type_display', read_only=True)
+    severity_display = serializers.CharField(source='get_severity_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
         model = SecurityIncident
-        fields = ['id', 'title', 'description', 'location', 'severity', 
+        fields = ['id', 'title', 'description', 'location', 'severity', 'severity_display',
                   'reported_by', 'reported_by_detail', 'assigned_to', 
-                  'assigned_to_detail', 'status', 'created_at', 'updated_at', 
-                  'resolved_at']
+                  'assigned_to_detail', 'status', 'status_display', 
+                  'report_type', 'report_type_display',
+                  'created_at', 'updated_at', 'resolved_at']
         read_only_fields = ['created_at', 'updated_at']
 
 class IncidentCommentSerializer(serializers.ModelSerializer):
