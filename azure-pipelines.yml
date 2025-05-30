@@ -1,0 +1,103 @@
+# Azure DevOps Pipeline para VeriAccessCAE Backend
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  pythonVersion: '3.11'
+  projectRoot: $(System.DefaultWorkingDirectory)
+
+stages:
+- stage: Build
+  displayName: 'Build and Test'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Django Application'
+    steps:
+    
+    # Usar Python especificado
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+      displayName: 'Use Python $(pythonVersion)'
+    
+    # Instalar dependencias
+    - script: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+      displayName: 'Install dependencies'
+    
+    # Ejecutar pruebas (opcional)
+    - script: |
+        python manage.py test --settings=veriaccesscae.settings_sqlite --no-input
+      displayName: 'Run tests'
+      continueOnError: true
+    
+    # Crear migraciones y base de datos SQLite
+    - script: |
+        python manage.py makemigrations --settings=veriaccesscae.settings_sqlite
+        python manage.py migrate --settings=veriaccesscae.settings_sqlite --run-syncdb
+      displayName: 'Create database and migrations'
+    
+    # Cargar datos iniciales
+    - script: |
+        python manage.py loaddata initial_data.json --settings=veriaccesscae.settings_sqlite || true
+      displayName: 'Load initial data'
+      continueOnError: true
+    
+    # Recolectar archivos estáticos
+    - script: |
+        python manage.py collectstatic --settings=veriaccesscae.settings_sqlite --no-input
+      displayName: 'Collect static files'
+    
+    # Crear archivo de inicio para Azure
+    - script: |
+        echo 'gunicorn --bind=0.0.0.0 --timeout 600 veriaccesscae.wsgi:application' > startup.txt
+      displayName: 'Create startup file'
+    
+    # Preparar artefactos
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: '$(projectRoot)'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+        replaceExistingArchive: true
+      displayName: 'Archive application'
+    
+    # Publicar artefactos
+    - publish: $(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip
+      artifact: drop
+      displayName: 'Publish artifact'
+
+- stage: Deploy
+  displayName: 'Deploy to Azure Web App'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeploymentJob
+    displayName: 'Deploy to Azure'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          
+          # Descargar artefactos
+          - download: current
+            artifact: drop
+          
+          # Desplegar a Azure Web App
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: '<nombre-de-tu-service-connection>'
+              appName: 'backend-VeriAccessCae'
+              package: '$(Pipeline.Workspace)/drop/$(Build.BuildId).zip'
+              appSettings: |
+                -DJANGO_SETTINGS_MODULE "veriaccesscae.settings_sqlite"
+                -SECRET_KEY "$(SECRET_KEY)"
+                -DEBUG "False"
+              startUpCommand: 'gunicorn --bind=0.0.0.0 --timeout 600 veriaccesscae.wsgi:application'

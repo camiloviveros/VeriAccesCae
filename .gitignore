@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Django
+*.log
+*.pot
+*.pyc
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Azure
+.azure/
+*.publishsettings
+*.pubxml
+
+# Secrets
+.env
+*.pem
+*.key
+
+# PostgreSQL settings (no necesitamos esto en Azure)
+veriaccesscae/settings.py
+
+# Scripts de migración (ya no los necesitamos)
+export_data.py
+migrate_to_sqlite.py
+
+# Fixtures (ya están importados en SQLite)
+fixtures/
+
+# Backup files
+*.bak
+*.backup
