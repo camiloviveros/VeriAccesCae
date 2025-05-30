@@ -12,6 +12,6 @@ import os
 from django.core.wsgi import get_wsgi_application
 
 # Usar settings_sqlite por defecto
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'veriaccesscae.settings_sqlite')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'veriaccesscae.settings')
 
 application = get_wsgi_application()
